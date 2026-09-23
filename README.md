@@ -55,6 +55,7 @@ each working yacht has its own file, `orders-<yacht>.json`.
   your orders. `.github/set-up-my-agent.js` is what that one runs.
 - Nothing updates itself. When the club publishes a newer `agent.js`, your agent opens an issue here
   and leaves the decision to you.
+- `.github/workflows/club-sync.yml` is for the club's own template only. In your copy it never runs.
 
 ## Reading it yourself
 

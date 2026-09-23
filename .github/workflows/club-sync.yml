@@ -1,0 +1,29 @@
+# CLUB ONLY. Keeps this template's agent.js the one the club publishes, after the club's site changes it.
+# In your own copy of the template this does nothing: its job runs only in github.com/normiesyachtclub/nyc-agent.
+name: Club only - sync agent.js
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  sync:
+    if: github.repository == 'normiesyachtclub/nyc-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Take the published agent.js, only if it matches its published checksum
+        run: |
+          curl -fsSL https://normiesyachtclub.com/agent/agent.js -o agent.new.js
+          want=$(curl -fsSL https://normiesyachtclub.com/agent/agent.sha256.txt | cut -d" " -f1)
+          got=$(sha256sum agent.new.js | cut -d" " -f1)
+          if [ -z "$want" ] || [ "$want" != "$got" ]; then
+            echo "  The published file and its published checksum disagree. Nothing was changed."; rm -f agent.new.js; exit 1
+          fi
+          if cmp -s agent.new.js agent.js; then echo "  agent.js is already the published one."; rm -f agent.new.js; exit 0; fi
+          mv agent.new.js agent.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add agent.js
+          git commit -m "agent.js: the club's published file, sha256 $got"
+          git push
