@@ -1773,6 +1773,16 @@ function plan(orders, facts, opts) {
     // there is still one definition of it ([[agent-autonomy-permissions]]).
     const notYours = x.yacht !== undefined && !ownsOrUnknown(seenFacts, x.yacht);
     const usesCalls = x.act === "work-deliver" || x.act === "competence-claim";
+    // ⚑ 23 Sep 2026, the founder's first Daily watch: on a day the member had already entered the draw and kept
+    // the watch by hand, both acts said "the club is not offering this", which read like a fault. The relay
+    // says exactly why, in the same facts the proposer reads, so the true sentence is said instead.
+    const openData = (r) => (r && r.state === "open" && r.data) || null;
+    const dailyNow = openData(seenFacts.daily), standNow = openData(seenFacts.standing);
+    const doneToday = (x.act === "daily-tide" && !!(dailyNow && dailyNow.tide && dailyNow.tide.entered === true))
+      ? "already done today: this wallet has entered today's free draw, so there was nothing to send"
+      : (x.act === "muster" && !!(standNow && standNow.entry && standNow.entry.musteredToday === true))
+        ? "already done today: this wallet's watch is kept for today, so there was nothing to send"
+        : null;
     quiet.push({
       act: x.act,
       why: !held[x.act].met ? held[x.act].why
@@ -1781,6 +1791,7 @@ function plan(orders, facts, opts) {
         : x.act === "work-join" ? "no open work fits your rules right now, or this yacht already has a part to hand in"
         : x.act === "work-deliver" ? "no part is waiting for this yacht, or your agent has not yet sent a transaction for it"
         : x.act === "competence-claim" ? "nothing new from this yacht to record, or it still owes a part"
+        : doneToday ? doneToday
         : "nothing to do: the club is not offering this right now"
     });
   });
