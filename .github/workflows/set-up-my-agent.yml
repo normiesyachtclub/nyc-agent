@@ -3,25 +3,39 @@
 #   Actions -> Set up my agent -> Run workflow -> pick the job, type your wallet (and the yacht, for
 #   a job that acts) -> Run workflow.
 #
-# It writes orders.json into this repository for you, from the club's own published list of jobs.
+# It writes your orders into this repository for you, from the club's own published list of jobs:
+# orders.json for a job of the whole wallet, orders-<yacht>.json for a job one yacht does. Run it
+# again for another yacht and that yacht JOINS your crew; the others stay as they are.
 # Nothing here holds a key. A job that ACTS also needs your key in Settings, Secrets and variables,
-# Actions, as a repository secret named NYC_AGENT_KEY.
+# Actions, as a repository secret named NYC_AGENT_KEY, granted in The Purser on every yacht that acts.
 name: Set up my agent
 on:
   workflow_dispatch:
     inputs:
       job:
-        description: "Which job"
+        description: "Which job (one the club has not opened yet is refused, and nothing is written)"
         required: true
         type: choice
         default: keep-me-posted
-        options: [keep-me-posted, daily-watch]
+        options: [keep-me-posted, daily-watch, island-work]
       wallet:
         description: "Your wallet address (0x…)"
         required: true
         type: string
       yacht:
-        description: "The yacht whose account authorises your key (only for a job that acts)"
+        description: "The yacht: for Daily watch the one your key is granted on, for Work at an island the one that works"
+        required: false
+        type: string
+      island:
+        description: "Work at an island only: the island's number (listed on The Purser and the Islands page)"
+        required: false
+        type: string
+      discipline:
+        description: "Work at an island only: your discipline, for example pilot"
+        required: false
+        type: string
+      paid_in:
+        description: "Work at an island only, and optional: the currency, for example usdc-base. Empty = any"
         required: false
         type: string
 permissions:
@@ -30,21 +44,33 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      JOB: ${{ inputs.job }}
+      WALLET: ${{ inputs.wallet }}
+      YACHT: ${{ inputs.yacht }}
+      ISLAND: ${{ inputs.island }}
+      DISCIPLINE: ${{ inputs.discipline }}
+      PAID_IN: ${{ inputs.paid_in }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Write the orders, from the club's own list of jobs
-        run: node .github/set-up-my-agent.js "${{ inputs.job }}" "${{ inputs.wallet }}" "${{ inputs.yacht }}"
+        id: write
+        run: node .github/set-up-my-agent.js "$JOB" "$WALLET" "$YACHT" "$ISLAND" "$DISCIPLINE" "$PAID_IN"
       - name: Read them back, without acting
-        run: node agent.js orders.json
+        env:
+          FILE: ${{ steps.write.outputs.file }}
+        run: node agent.js "$FILE"
       - name: Keep them
+        env:
+          FILE: ${{ steps.write.outputs.file }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add orders.json
-          git commit -m "Set up my agent: ${{ inputs.job }}" || { echo "  orders.json is already what you asked for."; exit 0; }
+          git add -- "$FILE"
+          git commit -m "Set up my agent: $JOB ($FILE)" || { echo "  $FILE is already what you asked for."; exit 0; }
           git push
       - name: What happens now
         run: |
-          echo "  Your agent runs every day by itself, from the NYC agent workflow."
-          echo "  When there is news it opens an issue here and GitHub emails you."
-          echo "  A job that acts needs the secret NYC_AGENT_KEY. Without it, it only tells you things."
+          echo "  Your agent runs every day by itself, from the NYC agent workflow, for every orders file here."
+          echo "  When there is news it opens ONE issue here and GitHub emails you."
+          echo "  A job that acts needs the secret NYC_AGENT_KEY, granted in The Purser on each yacht that acts."

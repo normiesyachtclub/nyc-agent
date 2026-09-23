@@ -2,8 +2,9 @@
 agent-key.txt
 brain-key.txt
 node_modules/
-# Your agent's own notes, kept between runs by the workflow's cache.
-orders.posted.json
-orders.ledger.json
-orders.calls.json
-orders.news.txt
+# Your agent's own notes, one set per orders file, kept between runs by the workflow's cache.
+orders*.posted.json
+orders*.ledger.json
+orders*.calls.json
+orders*.news.txt
+body.txt

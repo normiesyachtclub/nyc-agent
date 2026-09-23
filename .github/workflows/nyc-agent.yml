@@ -1,7 +1,8 @@
 # Your agent, every day, on GitHub's machines, so it works while your computer is off.
 # It is your repository and your key: the club never sees either, and runs none of this.
 #
-# Set up: Actions -> Set up my agent -> Run workflow (that writes orders.json for you).
+# Set up: Actions -> Set up my agent -> Run workflow (that writes your orders for you). Every orders
+# file here runs: orders.json for the wallet, and orders-<yacht>.json for each yacht of your crew.
 # If your job ACTS: Settings -> Secrets and variables -> Actions -> New repository secret,
 # named NYC_AGENT_KEY, holding the key The Purser gave you. Never commit that key here.
 # To stop it: disable this workflow in the Actions tab, and revoke the key on The Purser.
@@ -29,20 +30,22 @@ jobs:
       - name: Have you set it up?
         id: ready
         run: |
-          if [ ! -f orders.json ]; then
-            echo "  No orders.json yet. Actions -> Set up my agent -> Run workflow, and this starts working tomorrow."
+          found=no
+          for f in orders*.json; do [[ "$f" =~ ^orders(-[0-9]+)?\.json$ ]] && found=yes; done
+          if [ "$found" = no ]; then
+            echo "  No orders yet. Actions -> Set up my agent -> Run workflow, and this starts working tomorrow."
             echo "go=no" >> "$GITHUB_OUTPUT"
           else
             echo "go=yes" >> "$GITHUB_OUTPUT"
           fi
-      # What your agent already told you and already spent, carried from one day to the next.
+      # What your agent already told you and already spent, carried from one day to the next, per file.
       - if: steps.ready.outputs.go == 'yes'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
-            orders.posted.json
-            orders.ledger.json
-            orders.calls.json
+            orders*.posted.json
+            orders*.ledger.json
+            orders*.calls.json
           key: nyc-agent-${{ github.run_id }}
           restore-keys: nyc-agent-
       - name: The one thing it needs in order to sign
@@ -56,19 +59,29 @@ jobs:
           NYC_BRAIN_KEY: ${{ secrets.NYC_BRAIN_KEY }}
           NYC_BRAIN_URL: ${{ vars.NYC_BRAIN_URL }}
           NYC_BRAIN_MODEL: ${{ vars.NYC_BRAIN_MODEL }}
-        run: node agent.js orders.json --send
+        run: |
+          failed=0
+          for f in orders*.json; do
+            [[ "$f" =~ ^orders(-[0-9]+)?\.json$ ]] || continue
+            echo "::group::$f"
+            node agent.js "$f" --send || { failed=1; echo "  $f did not finish. Its lines above say why."; }
+            echo "::endgroup::"
+          done
+          exit "$failed"
       - name: Tell you
-        if: steps.ready.outputs.go == 'yes' && hashFiles('orders.news.txt') != ''
+        if: always() && steps.ready.outputs.go == 'yes' && hashFiles('orders*.news.txt') != ''
         env:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
         run: |
-          { cat orders.news.txt; echo; echo "@$OWNER this is your agent. Close this issue whenever you like."; } > body.txt
+          for f in orders*.news.txt; do [ -f "$f" ] && { cat "$f"; echo; }; done \
+            | awk '/^Read from the live club/ { if (r++) next } NF == 0 || !seen[$0]++' > body.txt
+          echo "@$OWNER this is your agent. Close this issue whenever you like." >> body.txt
           gh issue create --repo "$GITHUB_REPOSITORY" --title "Your agent: news for $(date -u +%F)" --body-file body.txt
       # ☠ NOTHING HERE EVER REPLACES agent.js. This file signs with your key, so a newer one is your
       # decision, never ours: the club publishes a checksum, this compares it, and tells you.
       - name: Is a newer agent published?
-        if: steps.ready.outputs.go == 'yes'
+        if: always() && steps.ready.outputs.go == 'yes'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

@@ -6,9 +6,9 @@ is off. It is your repository and your key. **The club never sees either, and ru
 ## Set it up, in two steps
 
 1. **Actions** tab, **Set up my agent**, **Run workflow**. Pick the job, type your wallet, and for a
-   job that acts, the number of the yacht whose account authorises your key. It writes `orders.json`
+   job that acts, the number of the yacht whose account authorises your key. It writes your orders
    for you.
-2. **Only if your job acts** (Daily watch): **Settings**, **Secrets and variables**, **Actions**,
+2. **Only if your job acts** (Daily watch, Work at an island): **Settings**, **Secrets and variables**, **Actions**,
    **New repository secret**, named `NYC_AGENT_KEY`, holding the key The Purser gave you.
 
 That is all. It runs every day by itself. When there is news it opens an issue here and GitHub
@@ -22,6 +22,21 @@ emails you.
 - **Daily watch** enters today's free draw and keeps your watch in the Regatta, every day, and tells
   you if either one did not go through. Both acts are free. It needs one key, granted on one yacht in
   The Purser.
+- **Work at an island**, once the club opens it, takes a part of work posted at the island you
+  choose, in your discipline, hands it in and records the competence your yacht earned. You give it
+  the yacht, the island, the discipline and, if you like, the currency: nothing is chosen for you.
+  If the club has not opened it yet, Set up my agent says so and writes nothing.
+
+## A crew: several yachts, one repository
+
+One repository is **one wallet**. The draw and the watch are once a day for the whole wallet, so
+Daily watch needs one yacht only, in `orders.json`. Work at an island is done by **each yacht**, so
+each working yacht has its own file, `orders-<yacht>.json`.
+
+- To add a yacht: run **Set up my agent** again with that yacht. It joins the crew; the others stay.
+- Grant the same key on that yacht too, in The Purser. One secret, `NYC_AGENT_KEY`, serves the crew.
+- Every file runs every day, and all the news arrives as **one** issue.
+- To take a yacht out: delete its `orders-<yacht>.json` here, and revoke the key on it in The Purser.
 
 ## What to know about the key
 
