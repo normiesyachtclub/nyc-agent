@@ -1,0 +1,36 @@
+Normies Yacht Club — CC0 1.0 Universal (Public Domain Dedication)
+=================================================================
+
+To the extent possible under law, the authors of Normies Yacht Club have waived all
+copyright and related or neighboring rights to this work.
+
+This dedication covers, without limitation:
+
+  * THE ART — every yacht and island image, the 40x40 bitmaps, and the on-chain
+    renderer output (tokenURI). The art is stored and rendered fully on-chain and is
+    permanently frozen (the renderer is locked).
+  * THE DATA — the public API under /api/v1/ (fleet, traits, per-yacht metadata and
+    bitmaps, collection stats) and all derived datasets.
+  * THE CODE — the art generator (art/yacht-generator.js), the website, and the
+    tooling in this repository.
+
+You may copy, modify, distribute, remix and build upon this work, for any purpose,
+including commercially, without asking permission and without attribution.
+Attribution is welcomed but never required.
+
+Build games, apps, merch, derivatives — it is yours.
+
+Full legal text of CC0 1.0 Universal:
+  https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+NO WARRANTY
+-----------
+The work is provided "as is", without warranty of any kind, express or implied. The
+authors are not liable for any claim, damages or other liability arising from the work
+or its use.
+
+Note on third parties: Normies Yacht Club is an independent, CC0 derivative inspired by
+Normies (normies.art). This dedication covers only the work described above; it makes no
+claim over any third-party project, brand or asset.
+
+Docs for builders: https://normiesyachtclub.com/developers.html

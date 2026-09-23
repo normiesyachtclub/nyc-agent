@@ -1,0 +1,83 @@
+# Your agent, every day, on GitHub's machines, so it works while your computer is off.
+# It is your repository and your key: the club never sees either, and runs none of this.
+#
+# Set up: Actions -> Set up my agent -> Run workflow (that writes orders.json for you).
+# If your job ACTS: Settings -> Secrets and variables -> Actions -> New repository secret,
+# named NYC_AGENT_KEY, holding the key The Purser gave you. Never commit that key here.
+# To stop it: disable this workflow in the Actions tab, and revoke the key on The Purser.
+name: NYC agent
+on:
+  schedule:
+    - cron: "23 7 * * *"   # every day at 07:23 UTC. Change it if you like.
+  workflow_dispatch: {}     # the Run workflow button
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: nyc-agent
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # Before anything: a repository nobody has set up yet says so, once, and stops. A red cross
+      # every morning for a thing the member has not done yet teaches them to ignore the mail.
+      - name: Have you set it up?
+        id: ready
+        run: |
+          if [ ! -f orders.json ]; then
+            echo "  No orders.json yet. Actions -> Set up my agent -> Run workflow, and this starts working tomorrow."
+            echo "go=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=yes" >> "$GITHUB_OUTPUT"
+          fi
+      # What your agent already told you and already spent, carried from one day to the next.
+      - if: steps.ready.outputs.go == 'yes'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            orders.posted.json
+            orders.ledger.json
+            orders.calls.json
+          key: nyc-agent-${{ github.run_id }}
+          restore-keys: nyc-agent-
+      - name: The one thing it needs in order to sign
+        if: steps.ready.outputs.go == 'yes'
+        run: npm install ethers@6.17.0 --no-save --no-audit --no-fund --loglevel=error
+      - name: Your agent
+        if: steps.ready.outputs.go == 'yes'
+        env:
+          NYC_AGENT_KEY: ${{ secrets.NYC_AGENT_KEY }}
+          # Only if your orders name a brain: the service's key as a secret, its address and model as variables.
+          NYC_BRAIN_KEY: ${{ secrets.NYC_BRAIN_KEY }}
+          NYC_BRAIN_URL: ${{ vars.NYC_BRAIN_URL }}
+          NYC_BRAIN_MODEL: ${{ vars.NYC_BRAIN_MODEL }}
+        run: node agent.js orders.json --send
+      - name: Tell you
+        if: steps.ready.outputs.go == 'yes' && hashFiles('orders.news.txt') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          { cat orders.news.txt; echo; echo "@$OWNER this is your agent. Close this issue whenever you like."; } > body.txt
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Your agent: news for $(date -u +%F)" --body-file body.txt
+      # ☠ NOTHING HERE EVER REPLACES agent.js. This file signs with your key, so a newer one is your
+      # decision, never ours: the club publishes a checksum, this compares it, and tells you.
+      - name: Is a newer agent published?
+        if: steps.ready.outputs.go == 'yes'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mine=$(sha256sum agent.js | cut -d" " -f1)
+          theirs=$(curl -fsSL https://normiesyachtclub.com/agent/agent.sha256.txt | cut -d" " -f1 || echo "")
+          if [ -n "$theirs" ] && [ "$mine" != "$theirs" ]; then
+            title="A newer agent.js is published"
+            if [ -z "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq ".[0].number")" ]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "The club has published a newer agent.js. Yours still works. To take it: download https://normiesyachtclub.com/agent/agent.js and replace agent.js here. Nothing updates itself, because this file signs with your key."
+            fi
+          fi

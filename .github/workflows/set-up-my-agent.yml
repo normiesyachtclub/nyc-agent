@@ -1,0 +1,50 @@
+# Run this ONCE, from the Actions tab, and your agent is set up.
+#
+#   Actions -> Set up my agent -> Run workflow -> pick the job, type your wallet (and the yacht, for
+#   a job that acts) -> Run workflow.
+#
+# It writes orders.json into this repository for you, from the club's own published list of jobs.
+# Nothing here holds a key. A job that ACTS also needs your key in Settings, Secrets and variables,
+# Actions, as a repository secret named NYC_AGENT_KEY.
+name: Set up my agent
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job"
+        required: true
+        type: choice
+        default: keep-me-posted
+        options: [keep-me-posted, daily-watch]
+      wallet:
+        description: "Your wallet address (0x…)"
+        required: true
+        type: string
+      yacht:
+        description: "The yacht whose account authorises your key (only for a job that acts)"
+        required: false
+        type: string
+permissions:
+  contents: write
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Write the orders, from the club's own list of jobs
+        run: node .github/set-up-my-agent.js "${{ inputs.job }}" "${{ inputs.wallet }}" "${{ inputs.yacht }}"
+      - name: Read them back, without acting
+        run: node agent.js orders.json
+      - name: Keep them
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add orders.json
+          git commit -m "Set up my agent: ${{ inputs.job }}" || { echo "  orders.json is already what you asked for."; exit 0; }
+          git push
+      - name: What happens now
+        run: |
+          echo "  Your agent runs every day by itself, from the NYC agent workflow."
+          echo "  When there is news it opens an issue here and GitHub emails you."
+          echo "  A job that acts needs the secret NYC_AGENT_KEY. Without it, it only tells you things."

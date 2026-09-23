@@ -1,0 +1,9 @@
+# Never commit a key. The Purser writes this file; the repository secret is where it belongs.
+agent-key.txt
+brain-key.txt
+node_modules/
+# Your agent's own notes, kept between runs by the workflow's cache.
+orders.posted.json
+orders.ledger.json
+orders.calls.json
+orders.news.txt
