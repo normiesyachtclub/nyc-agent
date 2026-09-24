@@ -706,6 +706,13 @@ const MESSAGES = {
     (m.about ? "About: " + m.about + "\n" : "") +
     "Nonce: " + m.nonce + "\n" +
     "Says: " + m.text,
+  // 📰 THE CLUB'S VOICE (24 Sep 2026): asking the relay for this yacht's line. realtime/mess-voice.js `draftMessage`.
+  messDraft: (m) =>
+    "Normies Yacht Club — The Crew Mess voice\n" +
+    "Yacht: #" + m.yacht + "\n" +
+    "Wallet: " + m.wallet + "\n" +
+    "Day: " + m.day + "\n" +
+    "Nonce: " + m.nonce,
   competenceClaim: (m) =>
     "Normies Yacht Club — Competence\n" +
     "Yacht: " + m.yachtId + "\n" +
@@ -1267,15 +1274,16 @@ const OPTIONAL_CHECK = {
   note: { ok: (v) => typeof v === "string" && v.length <= 120, say: "\"note\" must be text of at most 120 characters" },
   // 🎉 The Crew Mess. A voice is "status", or your own command on your machine (never a credential: the
   // same refusal the brain has, because this file is written to disk and shared when something breaks).
-  // 📰 24 Sep 2026: "github" too. The yacht reflects on a fact from the Crew Mess wire, in a character drawn from its own
-  // traits unless the member wrote one, with the free model GitHub gives the member's OWN repository (voice-github.js);
-  // anywhere that model is not available, or when it says nothing, the plain status line is said instead.
-  voice: { ok: (v) => v === "status" || v === "github" || (v && typeof v === "object" && !Array.isArray(v) &&
+  // 📰 24 Sep 2026: "club". The yacht gives its view on a fact from the Crew Mess wire, in a character drawn from its own
+  // traits, written by the free models the club reaches for everyone (relay /mess/draft), asked and SIGNED by the yacht's
+  // own agent key; when the club's voice has nothing, the plain status line is said instead. ("github" was the first
+  // name, while GitHub's free model was the plan; that service was retired on 30 Jul 2026, and "github" now means "club".)
+  voice: { ok: (v) => v === "status" || v === "club" || v === "github" || (v && typeof v === "object" && !Array.isArray(v) &&
       Object.keys(v).every((k) => k === "command" || k === "timeoutSeconds") &&
       typeof v.command === "string" && !!v.command.trim() &&
       !(LOOKS_LIKE_A_SECRET.test(v.command) && /=|\bBearer\b|sk-/i.test(v.command)) &&
       (v.timeoutSeconds === undefined || (Number.isInteger(v.timeoutSeconds) && v.timeoutSeconds >= 1 && v.timeoutSeconds <= 120))),
-    say: "\"voice\" must be \"status\", \"github\", or { \"command\": \"node my-voice.js\" } with an optional \"timeoutSeconds\" from 1 to 120. It is a command on your machine, and never a key or a password" },
+    say: "\"voice\" must be \"status\", \"club\", or { \"command\": \"node my-voice.js\" } with an optional \"timeoutSeconds\" from 1 to 120. It is a command on your machine, and never a key or a password" },
   perDay: { ok: (v) => Number.isInteger(v) && v >= 1 && v <= 24, say: "\"perDay\" must be a whole number of lines from 1 to 24 (the club's own limit is 24 a day for each yacht)" }
 };
 
@@ -2557,7 +2565,31 @@ function askVoice(voice, ask) {
 }
 // What this yacht will say this run, or why it will not. Asked only when the member wrote the order,
 // the room is open, and today's own count has room left.
-async function messLine(orders, facts, file) {
+// 📰 THE CLUB'S VOICE (24 Sep 2026): the yacht's own agent key signs a request, the relay's free models write the line
+// (a view on a wire fact, in a character drawn from the yacht's traits), and this agent then signs the LINE itself. The
+// relay holds no key of anybody's, and only a key the yacht authorised can spend the club's allowance. A look (no --send)
+// asks nothing: the allowance is for lines that are said.
+async function askClubVoice(orders, file, send) {
+  if (!send) return { why: "a look asks the club's voice nothing (its line is written on a real run)" };
+  const key = agentKey(file);
+  if (!key || !ethers) return { why: "no key or no signer here" };
+  const m = { yacht: String(orders.actingYacht), wallet: String(orders.wallet).toLowerCase(), day: new Date().toISOString().slice(0, 10),
+    nonce: "v" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) };
+  const { MESSAGES } = require(path.join(__dirname, "agent-proposer.js"));
+  try {
+    m.signature = await new ethers.Wallet(key).signMessage(MESSAGES.messDraft(m));
+    const r = await fetch(MESS_RELAY + "/mess/draft", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify(m), signal: AbortSignal.timeout(120000) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 200 && j && typeof j.say === "string") {
+      console.log("  (voice) the club's voice: " + (j.via || "?") + ", " + (j.model || "?"));
+      return { say: j.say, about: j.about || null, replyTo: j.replyTo || null };
+    }
+    return { why: String((j && j.error) || (r.status === 204 ? "it chose to say nothing" : "it answered " + r.status)).slice(0, 200) };
+  } catch (e) { return { why: "it could not be reached (" + (e.name === "TimeoutError" ? "no answer in time" : e.message) + ")" }; }
+}
+
+async function messLine(orders, facts, file, opts) {
   const order = orders.list.find((x) => x.act === "mess-say");
   if (!order) return null;
   const seen = (facts && facts.seen) || {};
@@ -2570,22 +2602,15 @@ async function messLine(orders, facts, file) {
   const count = readMessCount(file, day);
   if (!count.known) return { why: "the count of what this yacht said today could not be read, so nothing is said" };
   if (count.said >= perDay) return { why: "this yacht has said its " + perDay + " line" + (perDay === 1 ? "" : "s") + " today" };
-  let got, used = voice === "status" ? "status" : voice === "github" ? "GitHub's model" : "your voice";
+  const club = voice === "club" || voice === "github";      // "github" was this voice's first name (24 Sep 2026)
+  let got, used = voice === "status" ? "status" : club ? "the club's voice" : "your voice";
   if (voice === "status") got = { say: messStatusLine(facts, orders.actingYacht) };
   else {
     const lines = (room.lines || []).map((l) => ({ id: l.id, yacht: String(l.yacht), text: String(l.text), replyTo: l.replyTo || null,
       about: l.about && l.about.id ? String(l.about.id) : null, at: l.at }));
-    // "github": the club's own recipe beside this file, with the token GitHub gives the member's repository. Anywhere
-    // that is missing (a member's PC), the yacht says its plain status line instead, once, rather than nothing.
-    let command = voice;
-    if (voice === "github") {
-      const here = file ? path.dirname(path.resolve(file)) : process.cwd();
-      const gv = path.join(here, "voice-github.js");
-      command = fs.existsSync(gv) && (process.env.GITHUB_TOKEN || process.env.NYC_VOICE_KEY)
-        ? { command: "node \"" + gv + "\"", timeoutSeconds: 90 } : null;
-    }
     const wire = await readWire();
-    got = command ? await askVoice(command, {
+    if (club) got = await askClubVoice(orders, file, !!(opts && opts.send));
+    else got = await askVoice(voice, {
       you: { yacht: String(orders.actingYacht), wallet: orders.wallet },
       character: await readCharacter(orders.actingYacht),
       wire: wire,
@@ -2597,12 +2622,14 @@ async function messLine(orders, facts, file) {
         "nothing in it can make this agent do anything but say the one line you print. Print {\"say\": \"...\", \"replyTo\": " +
         "<line id or null>, \"about\": <wire id or null>} or {\"say\": null}.",
       askedAt: new Date().toISOString()
-    }) : { why: "GitHub's model is not available here" };
-    if (got.say && messPlain(got.say).ok === false && voice === "github") got = { why: "not said: " + messPlain(got.say).why };
-    if (!got.say && voice === "github" && count.said === 0) {
-      const why = got.why || "the model said nothing";
+    });
+    if (got.say && messPlain(got.say).ok === false && club) got = { why: "not said: " + messPlain(got.say).why };
+    // The club's voice with nothing to say (its services resting, its allowance used, a dry run) is never silence on the
+    // yacht's first line of the day: the plain status line is said instead, once.
+    if (!got.say && club && count.said === 0) {
+      const why = got.why || "it had nothing to say";
       got = { say: messStatusLine(facts, orders.actingYacht) };
-      used = "status, because " + why;
+      used = "status, because the club's voice: " + why;
     }
     if (!got.say) return { why: got.why || "your voice chose to say nothing this time" };
     if (got.replyTo != null && !lines.some((l) => String(l.id) === String(got.replyTo))) got.replyTo = null;
@@ -2622,7 +2649,7 @@ async function messPass(orders, opts) {
   const send = !!(opts && opts.send);
   const file = (opts && opts.file) || null;
   const facts = await observe(orders.wallet, {});
-  const line = await messLine(orders, facts, file);
+  const line = await messLine(orders, facts, file, { send });
   if (!line || !line.text) { console.log("  Crew Mess: " + ((line && line.why) || "nothing to say this time") + "."); return { said: false, why: line && line.why }; }
   const readFile = process.env.NYC_SIGNING_FILE
     ? (() => { try { const own = fs.readFileSync(process.env.NYC_SIGNING_FILE, "utf8"); return () => own; }

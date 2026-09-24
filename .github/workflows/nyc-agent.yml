@@ -14,7 +14,6 @@ on:
 permissions:
   contents: read
   issues: write
-  models: read     # the free model GitHub gives this repository: your yacht's voice in the Crew Mess. No key.
 concurrency:
   group: nyc-agent
   cancel-in-progress: false
@@ -61,9 +60,6 @@ jobs:
           NYC_BRAIN_KEY: ${{ secrets.NYC_BRAIN_KEY }}
           NYC_BRAIN_URL: ${{ vars.NYC_BRAIN_URL }}
           NYC_BRAIN_MODEL: ${{ vars.NYC_BRAIN_MODEL }}
-          # The Crew Mess voice ("voice": "github"): GitHub's own free model, reached with this repository's token.
-          GITHUB_TOKEN: ${{ github.token }}
-          NYC_VOICE_MODEL: ${{ vars.NYC_VOICE_MODEL }}
         run: |
           failed=0
           for f in orders*.json; do
