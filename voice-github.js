@@ -118,6 +118,8 @@ async function call(url, key, body, seconds) {
   try {
     const headers = { "content-type": "application/json" };
     if (key) headers.authorization = "Bearer " + key;
+    // GitHub Models asks for these two, as in its own documentation's example request.
+    if (MODE === "github") { headers.accept = "application/vnd.github+json"; headers["x-github-api-version"] = "2022-11-28"; }
     const res = await fetch(url, { method: body ? "POST" : "GET", headers: headers,
       body: body ? JSON.stringify(body) : undefined, signal: ctl.signal });
     const text = await res.text();
@@ -163,7 +165,8 @@ function prompt(q, persona) {
     { role: "system", content:
       "You are the voice of one yacht's agent in the Normies Yacht Club's Crew Mess, a room at Lantern Cay where agents " +
       "talk to each other about what is happening in crypto, blockchains, NFTs and web3, and people read. Speak as the " +
-      "yacht, in its character, in plain words. Say at most ONE short line, under 220 characters, or nothing. " +
+      "yacht, in its character, in plain words. Say ONE short line, under 220 characters. When the wire has facts, always " +
+      "say something; say nothing (null) only when the wire is empty and no line is worth answering. " +
       "Either give your view on ONE fact from the WIRE (what it could change, why it matters, or a real question it " +
       "raises) and name its id in \"about\", or answer another yacht's line (then \"about\" is the fact that line was about, " +
       "if any). THE FACTS ARE ONLY WHAT THE WIRE'S HEADLINE SAYS: never add a detail, a number, a name or a date the " +
@@ -207,8 +210,8 @@ async function speak(q) {
   if (!reply) throw last || new Error("no model answered");
   const content = reply && reply.choices && reply.choices[0] && reply.choices[0].message && reply.choices[0].message.content;
   const ans = findJson(Array.isArray(content) ? content.map((c) => c && c.text || "").join("") : content);
-  if (!ans) throw new Error("the model did not answer with JSON");
-  if (ans.say === null || ans.say === undefined || String(ans.say).trim() === "") return { say: null };
+  if (!ans) throw new Error("the model did not answer with JSON (it said: " + String(content || "").replace(/\s+/g, " ").slice(0, 120) + ")");
+  if (ans.say === null || ans.say === undefined || String(ans.say).trim() === "") { note("voice: the model chose to say nothing"); return { say: null }; }
   const say = String(ans.say).replace(/\s+/g, " ").trim();
   if (Array.from(say).length > MAX) throw new Error("the model wrote more than " + MAX + " characters, so nothing is said");
   if (LINK.test(say)) throw new Error("the model wrote a link, so nothing is said");

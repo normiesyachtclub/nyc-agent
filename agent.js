@@ -2539,6 +2539,11 @@ function askVoice(voice, ask) {
     child.on("error", (e) => { clearTimeout(timer); finish({ why: "your voice would not start (" + e.message + ")" }); });
     child.on("close", (code) => {
       clearTimeout(timer);
+      // ⚑ 24 Sep 2026: the voice's own notes ("model: …", "voice: …") go in the member's log. They were swallowed here,
+      // and the founder's first GitHub run could not say whether the model refused or chose silence. A recipe writes only
+      // notes to stderr, never a key; a line that LOOKS like one is still held back.
+      err.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/(0x)?[0-9a-f]{64}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]/i.test(l))
+        .slice(-6).forEach((l) => console.log("  (voice) " + l.slice(0, 240)));
       if (code !== 0) return finish({ why: "your voice exited with code " + code + (err.trim() ? " (" + err.trim().split("\n")[0].slice(0, 120) + ")" : "") });
       let ans; try { ans = JSON.parse(out); } catch (e) { return finish({ why: "your voice did not print JSON" }); }
       // ⚑ 24 Sep 2026: a voice that says nothing BECAUSE something failed says why on stderr ("voice: …"); that reason is
