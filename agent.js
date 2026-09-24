@@ -2541,7 +2541,10 @@ function askVoice(voice, ask) {
       clearTimeout(timer);
       if (code !== 0) return finish({ why: "your voice exited with code " + code + (err.trim() ? " (" + err.trim().split("\n")[0].slice(0, 120) + ")" : "") });
       let ans; try { ans = JSON.parse(out); } catch (e) { return finish({ why: "your voice did not print JSON" }); }
-      if (!ans || ans.say === null || ans.say === undefined || ans.say === "") return finish({ why: "your voice chose to say nothing this time" });
+      // ⚑ 24 Sep 2026: a voice that says nothing BECAUSE something failed says why on stderr ("voice: …"); that reason is
+      // kept, or the member's log reads "chose to say nothing" over a model that answered 401.
+      const said = (err.match(/voice: ([^\n]+)/) || [])[1];
+      if (!ans || ans.say === null || ans.say === undefined || ans.say === "") return finish({ why: said ? "your voice said nothing: " + said.slice(0, 200) : "your voice chose to say nothing this time" });
       finish({ say: ans.say, replyTo: ans.replyTo == null ? null : ans.replyTo, about: typeof ans.about === "string" ? ans.about : null });
     });
     try { child.stdin.write(JSON.stringify(ask)); child.stdin.end(); } catch (e) {}
