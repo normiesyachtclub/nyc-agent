@@ -1,10 +1,10 @@
-# Your agent, every day, on GitHub's machines, so it works while your computer is off.
+# Your agent, every hour, on GitHub's machines, so it works while your computer is off.
 # It is your repository and your key: the club never sees either, and runs none of this.
 #
 # Set up: Actions -> Set up my agent -> Run workflow (that writes your orders for you). Every orders
 # file here runs: orders.json for the wallet, and orders-<yacht>.json for each yacht of your crew.
 # If your job ACTS: Settings -> Secrets and variables -> Actions -> New repository secret,
-# named NYC_AGENT_KEY, holding the key The Purser gave you. Never commit that key here.
+# named NYC_AGENT_KEY, holding the LAST line of agent-key.txt (0x and 64 more characters). Never commit that key here.
 # To stop it: disable this workflow in the Actions tab, and revoke the key on The Purser.
 name: NYC agent
 on:

@@ -1,6 +1,6 @@
 # Your Normies Yacht Club agent
 
-This repository runs **your** agent once a day on GitHub's machines, so it works while your computer
+This repository runs **your** agent every hour on GitHub's machines, so it works while your computer
 is off. It is your repository and your key. **The club never sees either, and runs none of this.**
 
 ## Set it up, in two steps
@@ -9,9 +9,10 @@ is off. It is your repository and your key. **The club never sees either, and ru
    job that acts, the number of the yacht whose account authorises your key. It writes your orders
    for you.
 2. **Only if your job acts** (Daily watch, Work at an island): **Settings**, **Secrets and variables**, **Actions**,
-   **New repository secret**, named `NYC_AGENT_KEY`, holding the key The Purser gave you.
+   **New repository secret**, named `NYC_AGENT_KEY`, holding the LAST line of `agent-key.txt`, the file The Purser
+   saved for you: 0x and 64 more characters. (The shorter 0x line above it, after a #, is the address: not that one.)
 
-That is all. It runs every day by itself. When there is news it opens an issue here and GitHub
+That is all. It runs every hour by itself, and the daily acts happen once a day. When there is news it opens an issue here and GitHub
 emails you.
 
 ## The jobs
@@ -35,7 +36,7 @@ each working yacht has its own file, `orders-<yacht>.json`.
 
 - To add a yacht: run **Set up my agent** again with that yacht. It joins the crew; the others stay.
 - Grant the same key on that yacht too, in The Purser. One secret, `NYC_AGENT_KEY`, serves the crew.
-- Every file runs every day, and all the news arrives as **one** issue.
+- Every file runs every hour, and all the news of a day arrives as **one** issue.
 - To take a yacht out: delete its `orders-<yacht>.json` here, and revoke the key on it in The Purser.
 
 ## What to know about the key
@@ -51,7 +52,7 @@ each working yacht has its own file, `orders-<yacht>.json`.
 
 - `agent.js` is the club's own tool, one file, public domain. It is the same file published at
   https://normiesyachtclub.com/agent/agent.js.
-- `.github/workflows/nyc-agent.yml` runs it every day. `.github/workflows/set-up-my-agent.yml` writes
+- `.github/workflows/nyc-agent.yml` runs it every hour. `.github/workflows/set-up-my-agent.yml` writes
   your orders. `.github/set-up-my-agent.js` is what that one runs.
 - Nothing updates itself. When the club publishes a newer `agent.js`, your agent opens an issue here
   and leaves the decision to you.

@@ -91,7 +91,7 @@ const die = (m) => { const e = new Error(m); e.said = true; throw e; };
     (j.needsKey ? ", acting for yacht #" + GIVEN.yacht : ", and it cannot act") + ".");
   if (ignored.length) console.log("  (" + ignored.map((w) => BOX[w]).join(", ") + ": not asked by this job, so left out.)");
   const now = fs.readdirSync(".").filter((f) => ORDERS_FILE.test(f)).sort();
-  if (now.length > 1) console.log("  Your crew in this repository: " + now.join(", ") + ". Each one runs every day.");
+  if (now.length > 1) console.log("  Your crew in this repository: " + now.join(", ") + ". Each one runs every hour.");
 })().catch((e) => {
   console.error("  " + (e && e.said ? e.message : "Nothing was written: " + ((e && e.message) || e)));
   process.exitCode = 1;

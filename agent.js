@@ -460,7 +460,7 @@ function news(facts, opts) {
   (o.failed || []).forEach((f) => {
     add("failed:" + f.act + ":" + today,
       "Your agent tried to " + (ACT_SAID[f.act] || f.act) + " and it did not go through: " +
-      String(f.why || "no reason was given").replace(/\s+/g, " ").slice(0, 160));
+      String(f.why || "no reason was given").replace(/\s+/g, " ").slice(0, 320));
   });
 
   // 🏝 1b. THE MEMBER'S OWN ISLANDS, straight after anything refused (founder, 19 Sep 2026: islands must have
@@ -2198,6 +2198,25 @@ function keyTrouble() {
     "more). Put the LAST line of agent-key.txt in it, alone, with no spaces or quotes around it.";
 }
 
+// The club's refusal, in the member's words, with the one thing they can do about it. The club's own sentence is
+// kept (it is the fact); the JSON around it is not, because this line reaches an email.
+function refusalWords(status, text, orders) {
+  let said = String(text || "");
+  try { const j = JSON.parse(said); if (j && j.error) said = String(j.error); } catch (e) { /* not JSON: the text as it came */ }
+  said = said.replace(/\s+/g, " ").trim().slice(0, 120);
+  const y = orders && orders.actingYacht ? "yacht #" + orders.actingYacht : "the yacht in your orders";
+  let fix = "";
+  if (/neither the holder's nor a key/.test(said)) {
+    fix = " The key this agent holds is not granted on " + y + ": in The Purser, grant it on that yacht, or check the secret " +
+      "is the key you granted there.";
+  } else if (/is not yours/.test(said)) {
+    fix = " Run Set up my agent again with a yacht this wallet holds.";
+  } else if (/has not been yours for a day/.test(said)) {
+    fix = " It counts from tomorrow, by itself.";
+  }
+  return "the club said: " + said + "." + fix;
+}
+
 function agentKey(ordersFile) {
   if (process.env.NYC_AGENT_KEY) return keyFromText(process.env.NYC_AGENT_KEY);
   const dir = ordersFile ? path.dirname(path.resolve(ordersFile)) : process.cwd();
@@ -2633,16 +2652,29 @@ async function onceActs(orders, opts) {
     return told({ sent: 0, failed: 0 });
   }
   // ☠ A secret that holds no key is a member who THINKS their agent acts: say what it holds, and fail the run.
+  // ⚑ And the member is TOLD, in the issue GitHub emails them, not only in a log nobody opens (24 Sep 2026).
+  const notSent = (why) => plan.execute.forEach((a) => refused.push({ act: a.act, why: why }));
   const trouble = keyTrouble();
   if (trouble) {
     console.log("\n" + trouble + "\nNothing was sent.\n");
+    notSent(trouble);
     process.exitCode = 1;
-    return told({ sent: 0, failed: 0 });
+    return told({ sent: 0, failed: plan.execute.length });
   }
   if (!key) {
-    console.log("\nNo key here. Put agent-key.txt in this folder (The Purser can make one for you),");
-    console.log("or set NYC_AGENT_KEY. Nothing was sent.\n");
-    return told({ sent: 0, failed: 0 });
+    // ☠ 24 Sep 2026, a new holder driven end to end: Daily watch set up, the secret forgotten, and the run was
+    // GREEN, with a sentence about a folder that does not exist on GitHub. They would have been emailed the
+    // news every day and believed their watch was kept. Red, and the sentence for where it runs.
+    const onGitHub = process.env.GITHUB_ACTIONS === "true";
+    const why = onGitHub
+      ? "this repository has no secret called NYC_AGENT_KEY. Add it in Settings, Secrets and variables, Actions: " +
+        "the LAST line of agent-key.txt (0x and 64 more characters)"
+      : "there is no key here. Put agent-key.txt in this folder (The Purser can make one for you), or set NYC_AGENT_KEY";
+    console.log("\nYour orders act" + (orders.actingYacht ? " for yacht #" + orders.actingYacht : "") + ", but " + why + ".");
+    console.log("Nothing was sent.\n");
+    notSent(why);
+    process.exitCode = 1;
+    return told({ sent: 0, failed: plan.execute.length });
   }
   if (!ethers) {
     // ⚠ THE INSTRUCTION, NOT THE DIAGNOSIS. "It ships with the relay" is true of our repo and useless
@@ -2723,8 +2755,11 @@ async function onceActs(orders, opts) {
       // ⚠ The club's own words, not a guess at what they mean. A refusal here is usually one of two
       // things and the member can tell them apart: the key is not granted, or the moment passed.
       console.log("  refused (" + res.status + ") for " + act.act + ": " + text.slice(0, 160));
-      refused.push({ act: act.act, why: "the club said " + res.status + ": " + text.slice(0, 120) });
+      refused.push({ act: act.act, why: refusalWords(res.status, text, orders) });
       if (res.status === 409 || res.status === 422) markCall("refused by the club: " + text.slice(0, 100));
+      // ☠ A refusal about the KEY or the YACHT is the member's to fix and will be refused again every hour: the run
+      // goes red. A 503 or an unreachable club is the moment, and the next run tries again by itself.
+      if (res.status === 400 || res.status === 401 || res.status === 403) process.exitCode = 1;
     }
   }
   };
@@ -2789,7 +2824,7 @@ if (require.main === module) {
   if (ms) { console.log("Running again every " + valueOf("--every") + ". Stop it with ctrl-c.\n"); setInterval(tick, ms); }
 }
 
-module.exports = { once, everyMs, keyFromText, keyTrouble, ledgerOf, readLedger, writeLedger, callsOf, readCalls, writeCalls, tellMember, postedOf, newsOf, askBrain,
+module.exports = { once, everyMs, keyFromText, keyTrouble, refusalWords, ledgerOf, readLedger, writeLedger, callsOf, readCalls, writeCalls, tellMember, postedOf, newsOf, askBrain,
   messLine, messPass, messPlain, messStatusLine, messOf, askVoice, MESS_INVISIBLE, MESS_LINK, MESS_TEXT_MAX };
 
 };

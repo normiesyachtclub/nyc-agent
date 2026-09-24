@@ -71,6 +71,6 @@ jobs:
           git push
       - name: What happens now
         run: |
-          echo "  Your agent runs every day by itself, from the NYC agent workflow, for every orders file here."
+          echo "  Your agent runs every hour by itself, from the NYC agent workflow, for every orders file here (the daily acts once a day)."
           echo "  When there is news it opens ONE issue here and GitHub emails you."
           echo "  A job that acts needs the secret NYC_AGENT_KEY, granted in The Purser on each yacht that acts."
