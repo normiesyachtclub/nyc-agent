@@ -1,3 +1,10 @@
+# START ITS CLOCK, ONCE: type any word at the end of the next line, then press Commit changes, and Commit changes again.
+# Clock started by:
+#
+# (GitHub starts the hourly runs of a new copy only once this file has been changed in it. Measured 24 Sep 2026: a copy
+# made from the template ran only when its Run button was pressed, for hours, and ran by itself within two hours
+# of a one-word change here. Within two hours of yours, Actions shows a run marked "Scheduled": that is your agent.)
+#
 # Your agent, every hour, on GitHub's machines, so it works while your computer is off.
 # It is your repository and your key: the club never sees either, and runs none of this.
 #
@@ -14,6 +21,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: read             # only to see whether this repository has had a run marked Scheduled yet
 concurrency:
   group: nyc-agent
   cancel-in-progress: false
@@ -77,6 +85,14 @@ jobs:
         run: |
           for f in orders*.news.txt; do [ -f "$f" ] && { cat "$f"; echo; }; done \
             | awk '/^Read from the live club/ { if (r++) next } NF == 0 || !seen[$0]++' > body.txt
+          # A run started by hand says whether the clock is on: a green run of your own proves the job, never the clock.
+          # "0" only when GitHub answered and there is no Scheduled run; a failed read says nothing rather than guess.
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            scheduled=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nyc-agent.yml --event schedule --limit 1 --json databaseId --jq 'length' 2>/dev/null || echo "?")
+            if [ "$scheduled" = "0" ]; then
+              printf '%s\n\n' "You started this run by hand, and your agent has not yet run by itself here. If you have not started its clock: open $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/edit/$GITHUB_REF_NAME/.github/workflows/nyc-agent.yml, type any word at the end of the line \"# Clock started by:\", then press Commit changes, and Commit changes again. Within two hours Actions shows a run marked Scheduled: from then on it runs every hour by itself." >> body.txt
+            fi
+          fi
           echo "@$OWNER this is your agent. Close this issue whenever you like." >> body.txt
           title="Your agent: news for $(date -u +%F)"
           open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number,title --jq '.[] | "\(.number)\t\(.title)"' | awk -F'\t' -v t="$title" '$2 == t { print $1; exit }')

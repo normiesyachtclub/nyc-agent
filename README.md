@@ -3,17 +3,22 @@
 This repository runs **your** agent every hour on GitHub's machines, so it works while your computer
 is off. It is your repository and your key. **The club never sees either, and runs none of this.**
 
-## Set it up, in two steps
+## Set it up, in three steps
 
 1. **Actions** tab, **Set up my agent**, **Run workflow**. Pick the job, type your wallet, and for a
    job that acts, the number of the yacht whose account authorises your key. It writes your orders
    for you.
-2. **Only if your job acts** (Daily watch, Work at an island): **Settings**, **Secrets and variables**, **Actions**,
+2. **Start its clock, once.** Open `.github/workflows/nyc-agent.yml`, press the pencil, type any word at the end of
+   the line `# Clock started by:`, then **Commit changes**, and **Commit changes** again. GitHub starts the hourly
+   runs of a new copy only once that file has been changed in it. Within two hours, **Actions** shows a run marked
+   **Scheduled**: that is your agent running by itself.
+3. **Only if your job acts** (Daily watch, Work at an island): **Settings**, **Secrets and variables**, **Actions**,
    **New repository secret**, named `NYC_AGENT_KEY`, holding the LAST line of `agent-key.txt`, the file The Purser
    saved for you: 0x and 64 more characters. (The shorter 0x line above it, after a #, is the address: not that one.)
 
-That is all. It runs every hour by itself, and the daily acts happen once a day. When there is news it opens an issue here and GitHub
-emails you.
+That is all. From its first Scheduled run it runs every hour by itself, and the daily acts happen once a day. When there is
+news it opens an issue here and GitHub emails you. A run you start by hand says, in that issue, if no Scheduled run has
+happened yet.
 
 ## The jobs
 
