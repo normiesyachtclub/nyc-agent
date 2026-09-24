@@ -2176,8 +2176,30 @@ async function chainCall(act, wallet) {
  * with `#` is skipped, and the first thing that looks like a key is the key.
  * ⚠ It is still never printed, never logged, and never written by this file.
  */
+// ⚑ 24 Sep 2026, the founder's own first run on GitHub: the secret held something that was not a key, the run
+// printed "invalid private key" among other lines, signed nothing, and still went GREEN. Two fixes. The secret is
+// read as forgivingly as the file is (quotes, spaces, the whole file pasted, a key without 0x), and a secret that
+// still holds no key says WHAT it holds instead, in one sentence, and turns the run red (`keyTrouble`, `once`).
+// ☠ Neither ever prints the value: only its shape.
+function keyFromText(raw) {
+  const line = String(raw || "").split(/\r?\n/).map((l) => l.trim().replace(/^["']+|["']+$/g, "").trim())
+    .find((l) => l && l[0] !== "#" && /^(0x)?[0-9a-fA-F]{64}$/.test(l));
+  return line ? (line[0] === "0" && line[1] === "x" ? line : "0x" + line) : "";
+}
+function keyTrouble() {
+  const raw = process.env.NYC_AGENT_KEY;
+  if (!raw || keyFromText(raw)) return null;
+  const t = String(raw).trim().replace(/^["']+|["']+$/g, "").trim();
+  if (/^(#\s*)?(0x)?[0-9a-fA-F]{40}$/.test(t)) {
+    return "NYC_AGENT_KEY holds an ADDRESS (0x and 40 characters): that is the half you give out. The secret needs " +
+      "the KEY itself: the LAST line of agent-key.txt, 0x and 64 more characters, alone, with nothing around it.";
+  }
+  return "NYC_AGENT_KEY is set, but it is not a key: it has " + t.length + " characters, and a key has 66 (0x and 64 " +
+    "more). Put the LAST line of agent-key.txt in it, alone, with no spaces or quotes around it.";
+}
+
 function agentKey(ordersFile) {
-  if (process.env.NYC_AGENT_KEY) return process.env.NYC_AGENT_KEY.trim();
+  if (process.env.NYC_AGENT_KEY) return keyFromText(process.env.NYC_AGENT_KEY);
   const dir = ordersFile ? path.dirname(path.resolve(ordersFile)) : process.cwd();
   for (const name of ["agent-key.txt", "agent-key"]) {
     try {
@@ -2610,6 +2632,13 @@ async function onceActs(orders, opts) {
       : "\nNothing was sent. Add --send when you want this to act.\n");
     return told({ sent: 0, failed: 0 });
   }
+  // ☠ A secret that holds no key is a member who THINKS their agent acts: say what it holds, and fail the run.
+  const trouble = keyTrouble();
+  if (trouble) {
+    console.log("\n" + trouble + "\nNothing was sent.\n");
+    process.exitCode = 1;
+    return told({ sent: 0, failed: 0 });
+  }
   if (!key) {
     console.log("\nNo key here. Put agent-key.txt in this folder (The Purser can make one for you),");
     console.log("or set NYC_AGENT_KEY. Nothing was sent.\n");
@@ -2751,14 +2780,16 @@ if (require.main === module) {
   }
   const ms = everyMs(valueOf("--every"));
   const opts = { send: has("--send"), file: file };
-  const tick = () => once(parsed.orders, opts).catch((e) => console.error(e.message));
+  // ☠ An error that stops a run is a FAILED run: said, and the exit code says so too, or GitHub shows a green tick
+  // over an agent that did nothing (24 Sep 2026). A repeating run (--every) keeps going and says it each time.
+  const tick = () => once(parsed.orders, opts).catch((e) => { console.error(e.message); if (!ms) process.exitCode = 1; });
   tick();
   // ⚠ A plain interval, on purpose. A member should be able to read their own schedule, and a day
   // that turns at midnight UTC is the only clock any of these acts care about.
   if (ms) { console.log("Running again every " + valueOf("--every") + ". Stop it with ctrl-c.\n"); setInterval(tick, ms); }
 }
 
-module.exports = { once, everyMs, ledgerOf, readLedger, writeLedger, callsOf, readCalls, writeCalls, tellMember, postedOf, newsOf, askBrain,
+module.exports = { once, everyMs, keyFromText, keyTrouble, ledgerOf, readLedger, writeLedger, callsOf, readCalls, writeCalls, tellMember, postedOf, newsOf, askBrain,
   messLine, messPass, messPlain, messStatusLine, messOf, askVoice, MESS_INVISIBLE, MESS_LINK, MESS_TEXT_MAX };
 
 };
