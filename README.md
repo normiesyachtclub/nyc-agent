@@ -60,8 +60,8 @@ each working yacht has its own file, `orders-<yacht>.json`.
 - `.github/workflows/nyc-agent.yml` runs it every hour. `.github/workflows/set-up-my-agent.yml` writes
   your orders. `.github/set-up-my-agent.js` is what that one runs.
 - Nothing updates itself. When the club publishes a newer `agent.js`, your agent opens an issue here
-  and leaves the decision to you.
-- `.github/workflows/club-sync.yml` is for the club's own template only. In your copy it never runs.
+  with a link: press **Run workflow** on **Take the newer agent.js** and it is done (it takes the file only if
+  it matches the checksum the club publishes). Or leave it: the one you have keeps working.
 
 ## Reading it yourself
 

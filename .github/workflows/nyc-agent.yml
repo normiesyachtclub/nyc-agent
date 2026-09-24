@@ -95,6 +95,11 @@ jobs:
           if [ -n "$theirs" ] && [ "$mine" != "$theirs" ]; then
             title="A newer agent.js is published"
             if [ -z "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq ".[0].number")" ]; then
-              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "The club has published a newer agent.js. Yours still works. To take it: download https://normiesyachtclub.com/agent/agent.js and replace agent.js here. Nothing updates itself, because this file signs with your key."
+              if [ -f .github/workflows/take-newer-agent.yml ]; then
+                how="To take it, open $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/take-newer-agent.yml and press Run workflow, then Run workflow again. It takes the file only if it matches the checksum the club publishes."
+              else
+                how="To take it: download https://normiesyachtclub.com/agent/agent.js and replace agent.js here."
+              fi
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "The club has published a newer agent.js. Yours still works. $how Nothing updates itself, because this file signs with your key: taking it is your decision."
             fi
           fi
