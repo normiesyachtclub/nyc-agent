@@ -17,7 +17,7 @@ on:
         required: true
         type: choice
         default: keep-me-posted
-        options: [keep-me-posted, daily-watch, island-work]
+        options: [keep-me-posted, daily-watch, island-work, watch-and-mess]
       wallet:
         description: "Your wallet address (0x…)"
         required: true
