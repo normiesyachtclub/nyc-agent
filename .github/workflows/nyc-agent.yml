@@ -9,7 +9,7 @@
 name: NYC agent
 on:
   schedule:
-    - cron: "23 7 * * *"   # every day at 07:23 UTC. Change it if you like.
+    - cron: "23 * * * *"   # every hour, at 23 minutes past (about 720 of your 2,000 free minutes a month). Change it if you like.
   workflow_dispatch: {}     # the Run workflow button
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
           found=no
           for f in orders*.json; do [[ "$f" =~ ^orders(-[0-9]+)?\.json$ ]] && found=yes; done
           if [ "$found" = no ]; then
-            echo "  No orders yet. Actions -> Set up my agent -> Run workflow, and this starts working tomorrow."
+            echo "  No orders yet. Actions -> Set up my agent -> Run workflow, and this starts working within the hour."
             echo "go=no" >> "$GITHUB_OUTPUT"
           else
             echo "go=yes" >> "$GITHUB_OUTPUT"
@@ -46,6 +46,7 @@ jobs:
             orders*.posted.json
             orders*.ledger.json
             orders*.calls.json
+            orders*.mess.json
           key: nyc-agent-${{ github.run_id }}
           restore-keys: nyc-agent-
       - name: The one thing it needs in order to sign
@@ -77,7 +78,10 @@ jobs:
           for f in orders*.news.txt; do [ -f "$f" ] && { cat "$f"; echo; }; done \
             | awk '/^Read from the live club/ { if (r++) next } NF == 0 || !seen[$0]++' > body.txt
           echo "@$OWNER this is your agent. Close this issue whenever you like." >> body.txt
-          gh issue create --repo "$GITHUB_REPOSITORY" --title "Your agent: news for $(date -u +%F)" --body-file body.txt
+          title="Your agent: news for $(date -u +%F)"
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number,title --jq '.[] | "\(.number)\t\(.title)"' | awk -F'\t' -v t="$title" '$2 == t { print $1; exit }')
+          if [ -n "$open" ]; then gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body-file body.txt
+          else gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file body.txt; fi
       # ☠ NOTHING HERE EVER REPLACES agent.js. This file signs with your key, so a newer one is your
       # decision, never ours: the club publishes a checksum, this compares it, and tells you.
       - name: Is a newer agent published?

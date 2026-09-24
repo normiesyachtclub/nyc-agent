@@ -6,5 +6,6 @@ node_modules/
 orders*.posted.json
 orders*.ledger.json
 orders*.calls.json
+orders*.mess.json
 orders*.news.txt
 body.txt
