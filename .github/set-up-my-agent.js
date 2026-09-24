@@ -76,6 +76,8 @@ const die = (m) => { const e = new Error(m); e.said = true; throw e; };
     if (!A) die("The club's job \"" + j.title + "\" names \"" + act + "\", which its own list of acts does not carry. Nothing was written.");
     const o = { act: act };
     (A.needs || []).concat(A.optional || []).forEach((w) => { if (asks.indexOf(w) >= 0 && GIVEN[w]) o[w] = GIVEN[w]; });
+    // What the JOB itself fixes on an act, as the club publishes it (e.g. the Crew Mess voice): never a member's choice.
+    if (j.set && j.set[act] && typeof j.set[act] === "object") Object.assign(o, j.set[act]);
     return o;
   });
   const ignored = Object.keys(GIVEN).filter((w) => w !== "yacht" && GIVEN[w] && asks.indexOf(w) < 0);
