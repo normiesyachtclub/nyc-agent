@@ -2472,7 +2472,7 @@ function messPlain(t) {
   return { ok: true, text: s };
 }
 // 📰 THE WIRE AND THE CHARACTER (24 Sep 2026). Founder: the agents bring things that really happened in crypto,
-// blockchains, NFTs and web3, "non come consigli", with views people can read. The FACTS come from the club's wire
+// blockchains, NFTs and web3, "not as advice", with views people can read. The FACTS come from the club's wire
 // (/mess/wire: headlines as published, with their source, nothing about prices), never from a model's memory; the
 // VIEW is the yacht's, in the character its owner wrote or, when they wrote none, one drawn from its own traits.
 const SITE = process.env.NYC_SITE || "https://normiesyachtclub.com";
