@@ -17,7 +17,13 @@
 "use strict";
 const fs = require("fs");
 const DOC = process.env.NYC_ORDERS_DOC || "https://normiesyachtclub.com/api/v1/standing-orders.json";
-const [job, wallet, yacht, island, discipline, paidIn] = process.argv.slice(2).map((s) => String(s == null ? "" : s).trim());
+const RELAY = process.env.NYC_RELAY || "https://nyc-realtime.fly.dev";
+const [job = "", wallet = "", yacht = "", islandTyped = "", disciplineTyped = "", paidInTyped = ""] = process.argv.slice(2).map((s) => String(s == null ? "" : s).trim());
+// 🏝 28 Sep 2026: what a member types is taken the way they meant it. The Islands page prints "#1000001", so a
+// leading # is dropped; "Pilot" is "pilot"; "USDC-Base" is "usdc-base". Anything else is refused below, in words.
+const island = /^marina$/i.test(islandTyped) ? "marina" : islandTyped.replace(/^#\s*/, "");
+const discipline = disciplineTyped.toLowerCase();
+const paidIn = paidInTyped.toLowerCase();
 // The boxes of the "Set up my agent" form, by the word the club's language uses for each.
 const GIVEN = { yacht: yacht, venue: island, discipline: discipline, paidIn: paidIn };
 const BOX = { yacht: "yacht", venue: "island", discipline: "discipline", paidIn: "paid in" };
@@ -66,6 +72,26 @@ const die = (m) => { const e = new Error(m); e.said = true; throw e; };
     }
   }
   if (asks.indexOf("yacht") >= 0 && !/^\d{1,7}$/.test(GIVEN.yacht)) die("That yacht is not a number. Nothing was written.");
+  // ☠ 28 Sep 2026: a word the agent would only turn down at its first run, or worse, one that matches no work for
+  // ever without a word ("pilots"), is refused HERE, while the member is still looking at the form.
+  if (asks.indexOf("venue") >= 0 && GIVEN.venue && !/^(marina|\d{1,20})$/.test(GIVEN.venue)) {
+    die("The island is its number, digits only, for example 1000001: the Islands page shows it after the #. Nothing was written.");
+  }
+  if (asks.indexOf("paidIn") >= 0 && GIVEN.paidIn && !/^[a-z0-9]+-[a-z0-9]+$/.test(GIVEN.paidIn)) {
+    die("Paid in is a currency the club publishes, for example usdc-base, or leave it empty for any. Nothing was written.");
+  }
+  if (asks.indexOf("discipline") >= 0 && GIVEN.discipline) {
+    // Which disciplines exist is the club's answer, read from its relay, never a list kept in this file.
+    let names = null;
+    try {
+      const r = await fetch(RELAY + "/competences");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      names = Object.keys((await r.json()).disciplines || {});
+    } catch (e) { die("Could not read the club's disciplines (" + e.message + "). Nothing was written; try again."); }
+    if (names.indexOf(GIVEN.discipline) < 0) {
+      die("\"" + disciplineTyped + "\" is not a discipline the club has. It has: " + names.join(", ") + ". Nothing was written.");
+    }
+  }
 
   const published = Array.isArray(doc.acts) ? doc.acts : [];
   const orders = { version: 1, wallet: wallet };
