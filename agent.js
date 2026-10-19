@@ -505,6 +505,11 @@ function news(facts, opts) {
     add("watch:" + g.id + ":" + today, "You have not kept today's watch in " + (g.name || "the Regatta") +
       ". It closes at midnight UTC.");
   }
+  // A new season: nobody is in it until their first watch (19 Oct 2026, Season IV), so say THAT, not nothing.
+  if (g && g.status === "active" && st && st.entry === null && handled.indexOf("muster") < 0) {
+    add("watch:" + g.id + ":" + today, "You are not in " + (g.name || "the Regatta") +
+      " yet. Your first watch enters you, and it closes at midnight UTC.");
+  }
 
   // 4. the Sunday round: once when it opens, once when anybody may call it.
   const tide = D(s.tide);
@@ -771,7 +776,12 @@ function propose(facts, opts) {
 
   // 2. today's watch. The Cup is ranked on watches kept, and a day missed cannot be made up.
   const st = D(s.standing);
-  if (st && st.entry && st.entry.musteredToday === false) {
+  // ☠ 19 Oct 2026: a NEW season opens with `entry: null` for every wallet, and this used to require an entry, so an
+  // agent stopped keeping its captain's watch the day a season opened (found on yacht #8 when Season IV opened: the
+  // daily tide went in, the watch did not). The relay enters a captain at their first watch, a delegated key
+  // included (realtime/regatta.js handleCheckin -> ensureParticipant). An UNREAD standing is still no proposal.
+  const live = !!(st && st.season && st.season.status === "active");
+  if (st && ((st.entry && st.entry.musteredToday === false) || (live && st.entry === null))) {
     const season = (st.season && st.season.id) || (D(s.regatta) && D(s.regatta).season.id);
     if (season) {
       const day = new Date(now).toISOString().slice(0, 10);
