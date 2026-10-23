@@ -208,8 +208,7 @@ function surface(wallet) {
   const w = wallet || "";
   return [
     { key: "health",       url: RELAY + "/health" },
-    { key: "tide",         url: RELAY + "/tide" },
-    { key: "daily",        url: RELAY + "/tide/daily" + (w ? "?wallet=" + w : "") },
+    // ☠ 23 Oct 2026: the Tide (its weekly round and its daily draw) is retired, so neither is read any more.
     { key: "regatta",      url: RELAY + "/regatta" },
     { key: "forge",        url: RELAY + "/forge" },
     // 🏝 19 Sep 2026: the islands themselves, and what waking one costs. Both public and whole.
@@ -278,45 +277,6 @@ function read(facts) {
     L.push("  The relay did not answer. Nothing below could be read, so nothing below is stated.");
     return { lines: L, open, shut, unread: ["the relay itself"] };
   }
-
-  // ---- the Sunday round.  /tide -> { round: { id, prize, cost, cap, watermark, committed,
-  //      commits, callable, closesAt, closed, next }, history: [...] }
-  // ⚠ THE ROUND MOVES DURING THE DAY. `committed` and `commits` are true at the second they were
-  // read and at no other, which is why the line below carries the clock it was read at.
-  const tide = D(s.tide);
-  if (tide && tide.round) {
-    const r = tide.round;
-    if (!r.closed) {
-      open.push("the Tide, round " + r.id);
-      L.push("  THE TIDE, round " + r.id + ", is open. It draws for: " + (r.prize || "not stated") + ".");
-      L.push("    " + r.commits + " commits so far, " + r.committed + " of the " + r.watermark + " it needs.");
-      L.push("    " + r.cost + " Anchor Points a commit. A wallet may commit " + r.cap + " times, however many yachts it holds.");
-      L.push("    " + (r.callable ? "It can be called NOW by any member." : "It cannot be called yet.")
-        + (r.closesAt ? "  It closes " + when(r.closesAt) + "." : ""));
-      if (r.next) L.push("    The round after this one draws for: " + r.next + ".");
-      // ☠ Per wallet, this route cannot answer. `fleet` names yachts, not wallets, so how many of
-      // the three a member has used is not readable here. Saying nothing beats saying it wrongly.
-      L.push("    How many of your " + r.cap + " you have used is not something this route can say.");
-    } else {
-      shut.push("the Tide");
-      L.push("  THE TIDE: round " + r.id + " is closed.");
-    }
-  } else if (s.tide.state !== "open") unread.push("the Tide");
-
-  // ---- today's free draw.  /tide/daily -> { tide: { day, entries, entered, closesAt, marks } }
-  const dailyW = D(s.daily);
-  if (dailyW && dailyW.tide) {
-    const d = dailyW.tide;
-    if (facts.wallet) {
-      const inIt = d.entered === true;
-      L.push("  TODAY'S FREE DRAW (" + d.day + "): " + (inIt ? "this wallet is already in it." : "this wallet is NOT in it yet.")
-        + "  " + d.entries + " entered so far.");
-      if (!inIt) open.push("today's free draw");
-    } else {
-      L.push("  TODAY'S FREE DRAW (" + d.day + "): " + d.entries + " entered so far.");
-    }
-    if (d.closesAt) L.push("    It closes " + when(d.closesAt) + ". It costs nothing to enter.");
-  } else if (s.daily && s.daily.state !== "open") unread.push("today's free draw");
 
   // ---- the season.  /regatta -> { season: { id, name, status, day, days, endAt } }
   const reg = D(s.regatta);
@@ -438,7 +398,6 @@ function read(facts) {
 // and do what was just done for it; `opts.failed` names the ones it tried and the club refused, which is
 // the most useful thing an agent that works alone can ever tell its member.
 const ACT_SAID = {
-  "daily-tide": "enter today's free draw",
   "muster": "keep today's watch in the Regatta",
   "work-join": "take a part of posted work",
   "work-deliver": "hand in a part",
@@ -494,12 +453,7 @@ function news(facts, opts) {
       " opens " + when(g.nextSeasonAt) + ".");
   }
 
-  // 3. today's two free acts, unless the member's agent just did them.
-  const daily = D(s.daily);
-  if (daily && daily.tide && daily.tide.entered === false && handled.indexOf("daily-tide") < 0) {
-    add("draw:" + daily.tide.day, "Today's free draw is open and you are not in it. It costs nothing" +
-      (daily.tide.closesAt ? ", and it closes " + when(daily.tide.closesAt) : "") + ".");
-  }
+  // 3. today's watch, unless the member's agent just kept it.
   const st = D(s.standing);
   if (g && g.status === "active" && st && st.entry && st.entry.musteredToday === false && handled.indexOf("muster") < 0) {
     add("watch:" + g.id + ":" + today, "You have not kept today's watch in " + (g.name || "the Regatta") +
@@ -509,17 +463,6 @@ function news(facts, opts) {
   if (g && g.status === "active" && st && st.entry === null && handled.indexOf("muster") < 0) {
     add("watch:" + g.id + ":" + today, "You are not in " + (g.name || "the Regatta") +
       " yet. Your first watch enters you, and it closes at midnight UTC.");
-  }
-
-  // 4. the Sunday round: once when it opens, once when anybody may call it.
-  const tide = D(s.tide);
-  const r = tide && tide.round;
-  if (r && !r.closed) {
-    const PRIZE_SAID = { yacht: "a yacht from the club's vault", store: "an item from the club's shop", berth: "a berth",
-      "forging-slot": "a forging slot", "tide-mark": "a Tide mark", naming: "a naming right" };
-    add("tide:" + r.id, "Tide round " + r.id + " is open. It draws for " + (PRIZE_SAID[r.prize] || r.prize || "a prize the club did not state") +
-      (r.closesAt ? ", and it closes " + when(r.closesAt) : "") + ".");
-    if (r.callable) add("tide-callable:" + r.id, "Tide round " + r.id + " can be called now, by any member.");
   }
 
   // 5. a prize with this wallet's name on it.
@@ -760,7 +703,8 @@ function propose(facts, opts) {
 
   // 1. today's free draw. Costs nothing, so it is the first thing worth proposing.
   const daily = D(s.daily);
-  if (daily && daily.tide && daily.tide.entered === false) {
+  // ☠ 23 Oct 2026: never while the relay says the daily Tide has ended (`retired`, or `open: false`).
+  if (daily && daily.tide && daily.tide.entered === false && !daily.retired && daily.tide.open !== false) {
     const day = daily.tide.day;
     const m = { day, wallet, nonce: nonce() };
     out.push({
@@ -1234,11 +1178,14 @@ const amount = (unit, v) => unit === "eth" ? fromWei(asWei(unit, v)) + " ETH" : 
 // `costs` is what the act really spends, read at the moment of planning and never assumed. It returns
 // { unit, amount } or NULL for "could not be told", and null is never treated as free.
 const ACTS = {
-  "daily-tide": { needs: [], costs: () => ({ unit: null, amount: 0n }), what: "Read the tide. One free entry a day, however many yachts you hold." },
+  // ☠ RETIRED 23 Oct 2026 (founder): the Tide, its weekly round and its daily draw, has ended. The two acts stay
+  // KNOWN, so an orders file written before then is still valid and its watch is still kept, but they do nothing:
+  // the proposer never offers them, `plan` says so in `quiet`, and nothing publishes them as a choice.
+  "daily-tide": { retired: true, needs: [], costs: () => ({ unit: null, amount: 0n }), what: "Read the tide. Retired in October 2026: the Tide has ended, so this order does nothing." },
   "muster": { needs: [], costs: () => ({ unit: null, amount: 0n }), what: "Keep the day's watch. Presence is the whole of the Cup, and a missed day cannot be made up." },
   "tide-commit": { needs: ["yacht"], costs: (s, o) => { const c = commitCost(s, o && o.yacht);
       return typeof c === "number" && Number.isFinite(c) && c > 0 ? { unit: "anchorPoints", amount: BigInt(Math.round(c)) } : null; },
-    what: "Commit a named yacht to the open Tide round. It costs Anchor Points." },
+    retired: true, what: "Commit a named yacht to the open Tide round. Retired in October 2026: the Tide has ended, so this order does nothing." },
   // ☠☠ THE ONE THAT LEAVES THE CLUB. Everything above is a request to us; this is a transaction the
   // yacht's own account makes on Ethereum, and we are not in the path at all.
   // ☠ THE MEMBER SUPPLIES `to` AND `data`. THE CLUB SUPPLIES NEITHER, EVER, and there is nowhere in
@@ -1355,21 +1302,21 @@ const FIELDS = {
   // ⚠ The cost is per class now, so the one number a condition can name is a Cruiser's place, which
   // is exactly the rate. A heavier yacht costs its weight times this. What an order really spends is
   // read per yacht in `tide-commit` above, never from this field.
-  roundCost:      { kind: "number", what: "what a Cruiser, the lightest class, costs to commit to the open Tide round; a heavier class costs its weight times this",
+  roundCost:      { retired: true, kind: "number", what: "what a Cruiser, the lightest class, costs to commit to the open Tide round; a heavier class costs its weight times this",
                     read: (s) => { const r = roundField(s, "costPerWeight"); return typeof r === "number" && r > 0 ? r : roundField(s, "cost"); } },
-  roundCommits:   { kind: "number", what: "how many commits the open round has taken",
+  roundCommits:   { retired: true, kind: "number", what: "how many commits the open round has taken",
                     read: (s) => roundField(s, "commits") },
-  roundCommitted: { kind: "number", what: "Anchor Points committed to the open round so far",
+  roundCommitted: { retired: true, kind: "number", what: "Anchor Points committed to the open round so far",
                     read: (s) => roundField(s, "committed") },
-  roundWatermark: { kind: "number", what: "what the open round needs before anybody may call it",
+  roundWatermark: { retired: true, kind: "number", what: "what the open round needs before anybody may call it",
                     read: (s) => roundField(s, "watermark") },
-  roundCap:       { kind: "number", what: "how many times one wallet may commit to a round",
+  roundCap:       { retired: true, kind: "number", what: "how many times one wallet may commit to a round",
                     read: (s) => roundField(s, "cap") },
-  roundPrize:     { kind: "name",   what: "what the open round draws for",
+  roundPrize:     { retired: true, kind: "name",   what: "what the open round draws for",
                     read: (s) => roundField(s, "prize") },
-  nextPrize:      { kind: "name",   what: "what the round after this one draws for",
+  nextPrize:      { retired: true, kind: "name",   what: "what the round after this one draws for",
                     read: (s) => roundField(s, "next") },
-  dailyEntries:   { kind: "number", what: "how many wallets are in today's free draw",
+  dailyEntries:   { retired: true, kind: "number", what: "how many wallets are in today's free draw",
                     read: (s) => { const d = D(s.daily); return d && d.tide ? d.tide.entries : undefined; } },
   seasonDay:      { kind: "number", what: "which day of the season it is",
                     read: (s) => seasonField(s, "day") },
@@ -1426,6 +1373,7 @@ const TESTS = {
   isNot:   { kinds: ["number", "name"], holds: (v, w) => String(v) !== String(w) }
 };
 
+// ☠ `perRound` meant a Tide round. Still understood (an old orders file stays valid), never published (23 Oct 2026).
 const PERIODS = { perDay: "in a day", perRound: "in one Tide round" };
 
 const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(String(a || ""));
@@ -1556,7 +1504,7 @@ function parseWhen(when, where, problems) {
   names.forEach((f) => {
     const field = FIELDS[f];
     if (!field) {
-      problems.push(where + ": there is no fact called \"" + f + "\". The facts you may write a condition over are: " + Object.keys(FIELDS).join(", "));
+      problems.push(where + ": there is no fact called \"" + f + "\". The facts you may write a condition over are: " + Object.keys(FIELDS).filter((k) => !FIELDS[k].retired).join(", "));
       good = false; return;
     }
     const c = when[f];
@@ -1866,7 +1814,8 @@ function plan(orders, facts, opts) {
         : null;
     quiet.push({
       act: x.act,
-      why: !held[x.act].met ? held[x.act].why
+      why: (ACTS[x.act] && ACTS[x.act].retired) ? "retired: the Tide ended in October 2026, so this order does nothing and can be deleted"
+        : !held[x.act].met ? held[x.act].why
         : notYours ? "yacht #" + x.yacht + " is not in this wallet, so nothing was prepared for it"
         : (usesCalls && !callsKnown) ? "the record of what your agent sent on-chain could not be read, so nothing was handed in or recorded"
         : x.act === "work-join" ? "no open work fits your rules right now, or this yacht already has a part to hand in"
@@ -1994,14 +1943,14 @@ if (require.main === module) {
     console.log("An orders file looks like this. Nothing in it is a suggestion from us:\n");
     console.log(JSON.stringify({
       version: 1, wallet: "0x" + "11".repeat(20), actingYacht: "487",
-      orders: [{ act: "daily-tide" }, { act: "muster", when: { seasonDaysLeft: { atMost: 7 } } }]
+      orders: [{ act: "muster", when: { seasonDaysLeft: { atMost: 7 } } }]
     }, null, 2));
     console.log("\nThe acts you may write an order for:");
-    Object.keys(ACTS).forEach((k) => console.log("  " + k.padEnd(14) + ACTS[k].what));
+    Object.keys(ACTS).filter((k) => !ACTS[k].retired).forEach((k) => console.log("  " + k.padEnd(14) + ACTS[k].what));
     // The vocabulary is printed rather than documented elsewhere: a member should be able to read
     // the whole language off the tool that runs it.
     console.log("\nThe facts you may write a \"when\" over, with " + Object.keys(TESTS).join(", ") + ":");
-    Object.keys(FIELDS).forEach((k) => console.log("  " + k.padEnd(16) + FIELDS[k].what));
+    Object.keys(FIELDS).filter((k) => !FIELDS[k].retired).forEach((k) => console.log("  " + k.padEnd(16) + FIELDS[k].what));
     console.log("\nAnd the ceiling, which only you can write:");
     console.log("  \"budget\": { \"anchorPoints\": { \"perDay\": 300, \"perRound\": 100 } }");
     console.log("  Without one your agent spends nothing. The club will never write one for you.");
@@ -2517,17 +2466,16 @@ async function readCharacter(yachtId) {
   return r && r.state === "open" && r.data ? yachtCharacter(r.data) : null;
 }
 // One true line, from facts the club published about this yacht's captain today. Never a claim the
-// club did not make: a watch is named only when the relay says it is kept, the tide only when entered.
+// club did not make: a watch is named only when the relay says it is kept.
 function messStatusLine(facts, yacht) {
   const seen = (facts && facts.seen) || {};
   const open = (r) => (r && r.state === "open" && r.data) || null;
-  const st = open(seen.standing), reg = open(seen.regatta), daily = open(seen.daily);
+  const st = open(seen.standing), reg = open(seen.regatta);
   const season = (reg && reg.season) || (st && st.season) || null;
   const bits = [];
   if (st && st.entry && st.entry.musteredToday === true && season && season.status === "active") {
     bits.push("watch kept on day " + season.day + " of " + (season.name || "the season"));
   }
-  if (daily && daily.tide && daily.tide.entered === true) bits.push("today's tide is read");
   return bits.length ? "Yacht #" + yacht + " reporting: " + bits.join(", and ") + "."
                      : "Yacht #" + yacht + " is afloat and listening.";
 }
