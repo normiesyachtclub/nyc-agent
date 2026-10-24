@@ -2555,7 +2555,10 @@ async function messLine(orders, facts, file, opts) {
   if (!room) return { why: "the Crew Mess is not open" };
   if (!orders.actingYacht) return { why: "these orders name no actingYacht, so no yacht can speak" };
   const voice = order.voice || "status";
-  const perDay = order.perDay || (voice === "status" ? 1 : 3);
+  // 24 Oct 2026 (founder: "fresh news, about an hour old where possible, and always free"): the club's voice may speak on
+  // every hourly run, up to 24 a day (was three). It speaks only when the wire has news the room has not told: the relay
+  // answers "nothing new" (204) otherwise, before asking any service or counting anything. "perDay" in the orders decides.
+  const perDay = order.perDay || (voice === "status" ? 1 : 24);
   const day = new Date().toISOString().slice(0, 10);
   const count = readMessCount(file, day);
   if (!count.known) return { why: "the count of what this yacht said today could not be read, so nothing is said" };
